@@ -16,7 +16,8 @@ def main():
        entry_points=[CommandHandler('conversation', conversation)],
        states={1: [MessageHandler(Filters.text, first_response, pass_user_data=True)],
                2: [MessageHandler(Filters.text, second_response, pass_user_data=True)],
-               3: [MessageHandler(Filters.text, third_response, pass_user_data=True)]
+               3: [MessageHandler(Filters.text, third_response, pass_user_data=True)],
+               4: [MessageHandler(Filters.text, forth_response, pass_user_data=True)]
                },
        fallbacks=[CommandHandler('stop', stop)]
      )
@@ -39,22 +40,37 @@ def main():
 def echo(bot, updater):
     updater.message.reply_text('Привет!')
 
-def third_response():
-    pass
+
+def third_response(bot, update, user_data):
+    if 'пасмурно' in user_data['weather'] or 'облачно' in user_data['weather'] or 'дождь' in user_data['weather'] or 'гроза' in user_data['weather']:
+        update.message.reply_text('Это плохая погода, но лично мне она нравится')
+    elif 'солнечно' or 'ясно' in user_data['weather'] or 'солнце' in user_data['weather'] or 'хорошая' in user_data['weather']:
+        update.message.reply_text('Хорошая погода мне она нравится!')
+        return 4
+
+
+def forth_response(bot, update, user_data):
+    update.message.reply_text('Было интересно с тобой пообщаться, но мне нужно идти, у ботов тоже есть дела.')
+    return ConversationHandler.END
+
+
 def conversation(bot, updater, user_data):
     updater.message.reply_text("Привет, {}, где ты живешь?".format(updater.message.chat.username))
+    return 1
+
 
 def stop(bot, update):
     update.message.reply_text(
         "Жаль. А было бы интерсно пообщаться. Всего доброго!")
     return ConversationHandler.END
+
+
 def start(bot, update):
     update.message.reply_text(
         "Привет. Это полезный бот\n"
         "Бот может многое, например переводить тексты или искать что-то в интернете"
         "Больше можно узнать написав комманду /help \n"
     )
-    return 1
 
 
 def first_response(bot, update, user_data):
@@ -67,8 +83,8 @@ def first_response(bot, update, user_data):
 def second_response(bot, update, user_data):
     weather = update.message.text
     user_data['weather'] = weather
-    update.message.reply_text("Спасибо за участие в опросе! Привет, {0}!".
-                              format(user_data['locality']))  # Используем user_data в ответе.
+    update.message.reply_text("Я бы хотел побывать в твоем городе, привет {}!".
+                              format(user_data['locality']))
     return 3
 
 
@@ -135,28 +151,31 @@ def weather(bot, update):
 
 
 def geocoder(bot, updater):
-    geocoder_uri = "http://geocode-maps.yandex.ru/1.x/"
-    geocode = updater.message.text.split()[1]
-    response = requests.get(geocoder_uri, params={
-        "format": "json",
-        "geocode": geocode
-    })
+    try:
+        geocoder_uri = "http://geocode-maps.yandex.ru/1.x/"
+        geocode = updater.message.text.split()[1]
+        response = requests.get(geocoder_uri, params={
+            "format": "json",
+            "geocode": geocode
+        })
 
-    toponym = response.json()["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
-    toponym_coodrinates = toponym["Point"]["pos"]
-    toponym_longitude, toponym_lattitude = toponym_coodrinates.split(" ")
-    delta = '0.05'
-    ll = ",".join([toponym_longitude, toponym_lattitude])
-    spn = ",".join([delta, delta])
+        toponym = response.json()["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+        toponym_coodrinates = toponym["Point"]["pos"]
+        toponym_longitude, toponym_lattitude = toponym_coodrinates.split(" ")
+        delta = '0.05'
+        ll = ",".join([toponym_longitude, toponym_lattitude])
+        spn = ",".join([delta, delta])
 
-    static_api_request = "http://static-maps.yandex.ru/1.x/?ll={}&spn={}&l=map".format(ll, spn)
+        static_api_request = "http://static-maps.yandex.ru/1.x/?ll={}&spn={}&l=map".format(ll, spn)
 
-    updater.message.reply_text('{}:'.format(geocode))
+        updater.message.reply_text('{}:'.format(geocode))
 
-    bot.sendPhoto(
-        updater.message.chat.id,
-        static_api_request
-    )
+        bot.sendPhoto(
+            updater.message.chat.id,
+            static_api_request
+        )
+    except Exception as e:
+        update.message.reply_text(("Произошла ошибка: {}".format(e)))
 
 
 def help(bot, update):
@@ -166,6 +185,9 @@ def help(bot, update):
                               "Комада /date показывает текущую дату\n"
                               "Команда /time показывает текущее время\n"
                               "Команда /translater {Текст} выполняет перевод указанного текста на русский язык\n"
+                              "Команда /conversation начинает разговор с ботом"
+                              "Команда /stop останавливает текущий разгвор"
+                              "Команда /geocoder {Запрос} отправляет снимок со спутника по запросу"
                               )
 
 
